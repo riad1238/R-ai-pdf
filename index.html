@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Class Maker — Groq</title>
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--panel:#141c31;--line:#273653;--text:#f4f7ff;--muted:#aab6cc;--accent:#8b7cff;--accent2:#35c6a5}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#1b2850 0,#0b1020 55%);font:16px/1.5 Inter,system-ui,Arial,sans-serif;color:var(--text);min-height:100vh}
+main{max-width:900px;margin:48px auto;padding:0 20px}.hero{text-align:center;margin-bottom:28px}.tag{display:inline-block;border:1px solid #4c5680;border-radius:99px;padding:5px 12px;color:#c8c1ff;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+h1{font-size:clamp(32px,6vw,52px);line-height:1.05;margin:16px 0 10px;letter-spacing:-.04em}.hero p{color:var(--muted);max-width:620px;margin:auto}
+.panel{background:rgba(20,28,49,.94);border:1px solid var(--line);border-radius:22px;padding:26px;box-shadow:0 24px 80px #0005}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.field{display:flex;flex-direction:column;gap:7px}.wide{grid-column:1/-1}label{font-size:13px;font-weight:650;color:#d8e0f1}
+input,select,textarea{width:100%;background:#0d1528;border:1px solid #334360;color:var(--text);border-radius:11px;padding:12px 13px;font:inherit;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px #8b7cff22}textarea{min-height:104px;resize:vertical}
+button{border:0;border-radius:12px;padding:14px 18px;font:700 15px inherit;cursor:pointer;color:#0b1020;background:linear-gradient(100deg,#a89cff,#6fe0c5);width:100%;margin-top:20px}
+button:disabled{opacity:.55;cursor:wait}.hint{font-size:12px;color:var(--muted)}.status{display:none;margin-top:16px;padding:12px 14px;border-radius:10px;background:#0d1528;border:1px solid var(--line);color:#dce6f7;white-space:pre-wrap}.status.show{display:block}.status.error{border-color:#a94b60;color:#ffb9c4}
+.security{margin-top:18px;padding:12px 14px;border-radius:10px;background:#302717;border:1px solid #66512d;color:#f3dca9;font-size:12px}
+footer{text-align:center;color:#7f8ca5;font-size:12px;margin:20px}
+@media(max-width:650px){main{margin:24px auto}.panel{padding:18px}.grid{grid-template-columns:1fr}.wide{grid-column:auto}}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <span class="tag">AI-powered lesson builder</span>
+    <h1>Turn any topic into a lesson.</h1>
+    <p>Generate a structured classroom presentation with Groq, then download it as an editable PowerPoint.</p>
+  </header>
+  <section class="panel">
+    <form id="maker">
+      <div class="grid">
+        <div class="field wide">
+          <label for="apiKey">Groq API key</label>
+          <input id="apiKey" type="password" placeholder="Paste your Groq API key (gsk_…)" autocomplete="off" required>
+          <span class="hint">Used only in this browser session; it is not saved in this file.</span>
+        </div>
+        <div class="field wide">
+          <label for="topic">Lesson topic</label>
+          <input id="topic" placeholder="e.g. The water cycle" required maxlength="180">
+        </div>
+        <div class="field">
+          <label for="grade">Grade</label>
+          <select id="grade">
+            <option value="1">Grade 1</option><option value="2">Grade 2</option><option value="3">Grade 3</option>
+            <option value="4">Grade 4</option><option value="5">Grade 5</option><option value="6">Grade 6</option>
+            <option value="7">Grade 7</option><option value="8">Grade 8</option><option value="9">Grade 9</option>
+            <option value="10">Grade 10</option><option value="11">Grade 11</option><option value="12" selected>Grade 12</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="subject">Subject</label>
+          <input id="subject" placeholder="e.g. Science">
+        </div>
+        <div class="field">
+          <label for="language">Language</label>
+          <select id="language"><option>English</option><option>Arabic</option></select>
+        </div>
+        <div class="field">
+          <label for="slides">Number of slides</label>
+          <select id="slides"><option>5</option><option selected>8</option><option>10</option><option>12</option><option>15</option><option>20</option></select>
+        </div>
+        <div class="field wide">
+          <label for="instructions">Extra instructions (optional)</label>
+          <textarea id="instructions" placeholder="Add learning objectives, activities, examples, tone, or anything else you want included."></textarea>
+        </div>
+      </div>
+      <button id="generate" type="submit">Generate PowerPoint</button>
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+      <div class="security"><strong>Security note:</strong> This is a browser-only demo, not a secure server backend. Anyone using the page can inspect requests and access a key entered into it. Do not publish a real key in the HTML or share this page with an untrusted audience. For a public website, keep the Groq key on a server.</div>
+    </form>
+  </section>
+  <footer>AI Class Maker · Powered by Groq</footer>
+</main>
+<script>
+const form = document.getElementById('maker');
+const button = document.getElementById('generate');
+const statusBox = document.getElementById('status');
+
+function showStatus(message, isError=false) {
+  statusBox.textContent = message;
+  statusBox.className = 'status show' + (isError ? ' error' : '');
+}
+
+function cleanJson(text) {
+  const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const first = stripped.indexOf('{');
+  const last = stripped.lastIndexOf('}');
+  if (first < 0 || last < first) throw new Error('The AI returned an unexpected format. Please try again.');
+  return JSON.parse(stripped.slice(first, last + 1));
+}
+
+function addText(slide, text, x, y, w, h, opts={}) {
+  slide.addText(String(text ?? ''), {x,y,w,h,margin:0.08,breakLine:false,fit:'shrink',fontFace:'Aptos',color:'17233B',...opts});
+}
+
+function makePresentation(data, topic, grade, subject) {
+  if (!window.PptxGenJS) throw new Error('PowerPoint generator did not load. Check your internet connection and reload.');
+  const pptx = new PptxGenJS();
+  pptx.layout = 'LAYOUT_WIDE';
+  pptx.author = 'AI Class Maker';
+  pptx.subject = subject || 'Lesson presentation';
+  pptx.title = topic;
+  pptx.company = 'AI Class Maker';
+  pptx.lang = 'en-US';
+  const navy = '14213D', purple = '6657D9', pale = 'F3F4FC', teal = '2CBFA5';
+  const items = Array.isArray(data.slides) ? data.slides : [];
+  if (!items.length) throw new Error('The AI did not return any slides. Please try again.');
+  items.forEach((item, index) => {
+    const slide = pptx.addSlide();
+    slide.background = {color: index === 0 ? navy : 'FFFFFF'};
+    if (index === 0) {
+      slide.addShape(pptx.ShapeType.rect,{x:0,y:0,w:0.22,h:7.5,fill:{color:teal},line:{color:teal}});
+      addText(slide, subject || 'CLASS LESSON', 0.75, 0.72, 10.8, 0.35,{fontSize:13,bold:true,charSpacing:2,color:'AFA8FF'});
+      addText(slide, item.title || topic, 0.75, 1.65, 11.5, 2.0,{fontSize:34,bold:true,color:'FFFFFF',breakLine:false});
+      addText(slide, `Grade ${grade}  •  ${topic}`, 0.78, 4.05, 10.8, 0.55,{fontSize:17,color:'D6DDF0'});
+      addText(slide, 'Learn • Explore • Practice', 0.78, 6.55, 10.8, 0.35,{fontSize:12,color:'AFA8FF',bold:true});
+    } else {
+      slide.addShape(pptx.ShapeType.rect,{x:0,y:0,w:13.333,h:0.16,fill:{color:purple},line:{color:purple}});
+      addText(slide, item.title || `Lesson ${index+1}`, 0.65, 0.48, 12, 0.75,{fontSize:27,bold:true,color:navy});
+      const bullets = Array.isArray(item.bullets) ? item.bullets : [];
+      if (bullets.length) {
+        slide.addText(bullets.map(b=>({text:String(b),options:{bullet:{indent:17},hanging:4,breakLine:true}})),{
+          x:0.85,y:1.55,w:11.55,h:3.75,fontFace:'Aptos',fontSize:19,color:'26344F',paraSpaceAfterPt:16,breakLine:false,fit:'shrink',margin:0.1,valign:'mid'
+        });
+      }
+      if (item.activity || item.example || item.key_takeaway) {
+        slide.addShape(pptx.ShapeType.roundRect,{x:0.8,y:5.55,w:11.7,h:1.05,rectRadius:0.12,fill:{color:pale},line:{color:'E2E5F2'}});
+        const extra = item.activity ? `ACTIVITY  ·  ${item.activity}` : item.example ? `EXAMPLE  ·  ${item.example}` : `KEY TAKEAWAY  ·  ${item.key_takeaway}`;
+        addText(slide,extra,1.05,5.78,11.2,0.6,{fontSize:13,bold:true,color:purple,fit:'shrink'});
+      }
+      addText(slide,`${index+1} / ${items.length}`,11.85,7.08,0.8,0.2,{fontSize:9,color:'8792A8',align:'right'});
+    }
+    if (item.speaker_notes) slide.addNotes(String(item.speaker_notes));
+  });
+  return pptx;
+}
+
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const topic = document.getElementById('topic').value.trim();
+  const grade = document.getElementById('grade').value;
+  const subject = document.getElementById('subject').value.trim();
+  const language = document.getElementById('language').value;
+  const slideCount = Number(document.getElementById('slides').value);
+  const instructions = document.getElementById('instructions').value.trim();
+
+  if (!apiKey || !topic) return;
+  button.disabled = true;
+  button.textContent = 'Creating your lesson…';
+  showStatus('Connecting to Groq and building your slides. This may take a little while.');
+  try {
+    const prompt = `Create a high-quality classroom lesson presentation.
+Topic: ${topic}
+Grade: ${grade}
+Subject: ${subject || 'Choose the most relevant subject'}
+Language: ${language}
+Number of slides: exactly ${slideCount}
+Extra instructions: ${instructions || 'None'}
+Return ONLY valid JSON with this structure:
+{"slides":[{"title":"Slide title","bullets":["concise point 1","concise point 2","concise point 3"],"activity":"short activity or empty string","example":"short example or empty string","key_takeaway":"short takeaway or empty string","speaker_notes":"teacher notes"}]}
+Make slide 1 a strong title slide. Make the remaining slides age-appropriate, accurate, engaging, logically ordered, and classroom-ready. Include a recap and a short quiz or check-for-understanding near the end. Use ${language} throughout. Do not include markdown fences.`;
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          {role:'system',content:'You are an expert teacher and presentation designer. Follow the requested JSON format exactly.'},
+          {role:'user',content:prompt}
+        ],
+        temperature:0.7,
+        max_completion_tokens:6000,
+        response_format:{type:'json_object'}
+      })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error?.message || `Groq request failed (${response.status}). Check your API key and model access.`);
+    const content = result.choices?.[0]?.message?.content;
+    if (!content) throw new Error('Groq returned an empty response.');
+    const lesson = cleanJson(content);
+    showStatus('Lesson created. Preparing your editable PowerPoint…');
+    const pptx = makePresentation(lesson, topic, grade, subject);
+    const filename = topic.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || 'lesson';
+    await pptx.writeFile({fileName:`${filename}-lesson.pptx`});
+    showStatus('Done! Your PowerPoint has been downloaded.');
+  } catch (error) {
+    showStatus(error.message || 'Something went wrong. Please try again.', true);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Generate PowerPoint';
+  }
+});
+</script>
+</body>
+</html>
